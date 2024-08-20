@@ -1,1 +1,3 @@
-python-telegram-bot==20.3
+mysql-connector-python==8.0.33
+python-telegram-bot==20.0
+requests==2.31.0
