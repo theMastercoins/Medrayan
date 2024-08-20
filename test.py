@@ -1,5 +1,6 @@
-from telegram import Update, InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update
 
 # Replace 'YOUR_TOKEN_HERE' with your actual bot token
 TOKEN = '7514128984:AAFzpRzhjpFxLpj4E70QlBdPF7HGRfFhlww'
@@ -10,7 +11,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Create the buttons
     keyboard = [
-        [InlineKeyboardButton("Let's See", url='t.me/realmastercoin_bot/mastercoin')],
+        [InlineKeyboardButton("Let's See", url='https://t.me/realmastercoin_bot/mastercoin')],
         [InlineKeyboardButton("Join Community", url='https://t.me/TheMasterCoinOfficial')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
