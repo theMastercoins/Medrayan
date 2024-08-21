@@ -23,14 +23,15 @@ def generate_balance(is_premium):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
     username = user.username if user.username else user.first_name
+    user_id = user.id
 
     # Connect to the database
     db = mysql.connector.connect(**DB_CONFIG)
     cursor = db.cursor()
 
     try:
-        # Check if user exists
-        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+        # Check if user exists by user_id or username
+        cursor.execute("SELECT * FROM users WHERE user_id = %s OR username = %s", (user_id, username))
         result = cursor.fetchone()
 
         if result is None:
@@ -41,29 +42,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             balance = generate_balance(is_premium)
 
             # Insert the new user into the database
-            cursor.execute("INSERT INTO users (username, balance, haspremium, referral_link) VALUES (%s, %s, %s, %s)",
-                           (username, balance, is_premium, ''))
+            cursor.execute("INSERT INTO users (username, user_id, balance, haspremium, referral_link) VALUES (%s, %s, %s, %s, %s)",
+                           (username, user_id, balance, is_premium, ''))
             db.commit()
 
+            # New user registration message
+            welcome_message = f"Welcome, {username}! You have successfully registered."
+        else:
+            # User already exists, log them in
+            welcome_message = f"Welcome back, {username}!"
+
         # Check if the user was referred by someone
-        if context.args:
+        if context.args and result is None:  # Only process referral if it's a new registration
             inviter_id = int(context.args[0])
             inviter_username = (await context.bot.get_chat(inviter_id)).username
 
             # Update the referral count and balance for the inviter
-            cursor.execute("UPDATE users SET referrals_count = referrals_count + 1 WHERE username = %s", (inviter_username,))
-            cursor.execute("UPDATE users SET balance = balance + 1200 WHERE username = %s", (inviter_username,))
+            cursor.execute("UPDATE users SET referrals_count = referrals_count + 1 WHERE user_id = %s", (inviter_id,))
+            cursor.execute("UPDATE users SET balance = balance + 1200 WHERE user_id = %s", (inviter_id,))
+            
+            # Update the balance for the newly invited user
+            cursor.execute("UPDATE users SET balance = balance + 1200 WHERE user_id = %s", (user_id,))
+            
             db.commit()
 
             # Notify the inviter
             await context.bot.send_message(
                 chat_id=inviter_id,
-                text="You Have A New Referral!"
+                text="You Have A New Referral! You've earned 1200 $MASTER."
             )
 
             # Notify the invited user
             await update.message.reply_text(
-                f"You Have Been Referred By {inviter_username}!"
+                f"You Have Been Referred By {inviter_username}! You've earned 1200 $MASTER."
             )
 
         # Create the buttons
@@ -73,11 +84,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Send the photo with caption and buttons
+        # Send the welcome message and buttons
+        await update.message.reply_text(welcome_message)
         await context.bot.send_photo(
             chat_id=update.message.chat_id,
             photo=open('masterlion.png', 'rb'),  # Ensure 'masterlion.png' is in the same directory as this script
-            caption=f"Hi {username}!\n\nYour Telegram Profile Decide Your Rewards!\nAre You Ready To See How Much You Can Earn Join Now.",
+            caption=f"Hi {username}!\n\nYour Telegram Profile Decides Your Rewards!\nAre You Ready To See How Much You Can Earn Join Now.",
             reply_markup=reply_markup
         )
     except mysql.connector.Error as err:
@@ -91,9 +103,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def refer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
     username = user.username if user.username else user.first_name
+    user_id = user.id
 
     # Generate referral link
-    referral_link = f"https://t.me/realmastercoin_bot?start={username}"
+    referral_link = f"https://t.me/realmastercoin_bot?start={user_id}"
 
     # Connect to the database
     db = mysql.connector.connect(**DB_CONFIG)
@@ -101,7 +114,7 @@ async def refer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     try:
         # Get the total referrals count
-        cursor.execute("SELECT referrals_count FROM users WHERE username = %s", (username,))
+        cursor.execute("SELECT referrals_count FROM users WHERE user_id = %s", (user_id,))
         result = cursor.fetchone()
         referrals_count = result[0] if result else 0
 
